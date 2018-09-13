@@ -1,65 +1,68 @@
-package store
+package prefix
 
 import (
 	"io"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/cosmos/cosmos-sdk/store/cachekv"
+	"github.com/cosmos/cosmos-sdk/store/tracekv"
 )
 
-var _ KVStore = prefixStore{}
+var _ sdk.KVStore = Store{}
 
-type prefixStore struct {
-	parent KVStore
+type Store struct {
+	parent sdk.KVStore
 	prefix []byte
 }
 
 // Implements Store
-func (s prefixStore) GetStoreType() StoreType {
+func (s Store) GetStoreType() sdk.StoreType {
 	return s.parent.GetStoreType()
 }
 
 // Implements CacheWrap
-func (s prefixStore) CacheWrap() CacheWrap {
-	return NewCacheKVStore(s)
+func (s Store) CacheWrap() sdk.CacheWrap {
+	return cachekv.NewStore(s)
 }
 
 // CacheWrapWithTrace implements the KVStore interface.
-func (s prefixStore) CacheWrapWithTrace(w io.Writer, tc TraceContext) CacheWrap {
-	return NewCacheKVStore(NewTraceKVStore(s, w, tc))
+func (s Store) CacheWrapWithTrace(w io.Writer, tc sdk.TraceContext) sdk.CacheWrap {
+	return cachekv.NewStore(tracekv.NewStore(s, w, tc))
 }
 
 // Implements KVStore
-func (s prefixStore) Get(key []byte) []byte {
+func (s Store) Get(key []byte) []byte {
 	return s.parent.Get(append(s.prefix, key...))
 }
 
 // Implements KVStore
-func (s prefixStore) Has(key []byte) bool {
+func (s Store) Has(key []byte) bool {
 	return s.parent.Has(append(s.prefix, key...))
 }
 
 // Implements KVStore
-func (s prefixStore) Set(key, value []byte) {
+func (s Store) Set(key, value []byte) {
 	s.parent.Set(append(s.prefix, key...), value)
 }
 
 // Implements KVStore
-func (s prefixStore) Delete(key []byte) {
+func (s Store) Delete(key []byte) {
 	s.parent.Delete(append(s.prefix, key...))
 }
 
 // Implements KVStore
-func (s prefixStore) Prefix(prefix []byte) KVStore {
-	return prefixStore{s, prefix}
+func (s Store) Prefix(prefix []byte) sdk.KVStore {
+	return Store{s, prefix}
 }
 
 // Implements KVStore
-func (s prefixStore) Gas(meter GasMeter, config GasConfig) KVStore {
+func (s Store) Gas(meter sdk.GasMeter, config sdk.GasConfig) sdk.KVStore {
 	return NewGasKVStore(meter, config, s)
 }
 
 // Implements KVStore
-func (s prefixStore) Iterator(start, end []byte) Iterator {
+func (s Store) Iterator(start, end []byte) sdk.Iterator {
 	if end == nil {
 		end = sdk.PrefixEndBytes(s.prefix)
 	} else {
@@ -72,7 +75,7 @@ func (s prefixStore) Iterator(start, end []byte) Iterator {
 }
 
 // Implements KVStore
-func (s prefixStore) ReverseIterator(start, end []byte) Iterator {
+func (s Store) ReverseIterator(start, end []byte) sdk.Iterator {
 	if end == nil {
 		end = sdk.PrefixEndBytes(s.prefix)
 	} else {
@@ -87,7 +90,7 @@ func (s prefixStore) ReverseIterator(start, end []byte) Iterator {
 type prefixIterator struct {
 	prefix []byte
 
-	iter Iterator
+	iter sdk.Iterator
 }
 
 // Implements Iterator
