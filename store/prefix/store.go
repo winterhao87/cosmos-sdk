@@ -5,8 +5,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/cosmos/cosmos-sdk/store/cachekv"
-	"github.com/cosmos/cosmos-sdk/store/tracekv"
+	"github.com/cosmos/cosmos-sdk/store/cache"
+	"github.com/cosmos/cosmos-sdk/store/trace"
 )
 
 var _ sdk.KVStore = Store{}
@@ -16,19 +16,14 @@ type Store struct {
 	prefix []byte
 }
 
-// Implements Store
-func (s Store) GetStoreType() sdk.StoreType {
-	return s.parent.GetStoreType()
-}
-
 // Implements CacheWrap
 func (s Store) CacheWrap() sdk.CacheWrap {
-	return cachekv.NewStore(s)
+	return cache.NewStore(s)
 }
 
 // CacheWrapWithTrace implements the KVStore interface.
 func (s Store) CacheWrapWithTrace(w io.Writer, tc sdk.TraceContext) sdk.CacheWrap {
-	return cachekv.NewStore(tracekv.NewStore(s, w, tc))
+	return cache.NewStore(trace.NewStore(s, w, tc))
 }
 
 // Implements KVStore
@@ -49,16 +44,6 @@ func (s Store) Set(key, value []byte) {
 // Implements KVStore
 func (s Store) Delete(key []byte) {
 	s.parent.Delete(append(s.prefix, key...))
-}
-
-// Implements KVStore
-func (s Store) Prefix(prefix []byte) sdk.KVStore {
-	return Store{s, prefix}
-}
-
-// Implements KVStore
-func (s Store) Gas(meter sdk.GasMeter, config sdk.GasConfig) sdk.KVStore {
-	return NewGasKVStore(meter, config, s)
 }
 
 // Implements KVStore
