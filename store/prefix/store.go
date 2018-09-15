@@ -1,17 +1,17 @@
 package prefix
 
 import (
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/store/types"
 )
 
-var _ sdk.KVStore = Store{}
+var _ types.KVStore = Store{}
 
 type Store struct {
-	parent sdk.KVStore
+	parent types.KVStore
 	prefix []byte
 }
 
-func NewStore(parent sdk.KVStore, prefix []byte) Store {
+func NewStore(parent types.KVStore, prefix []byte) Store {
 	return Store{
 		parent: parent,
 		prefix: prefix,
@@ -39,9 +39,9 @@ func (s Store) Delete(key []byte) {
 }
 
 // Implements KVStore
-func (s Store) Iterator(start, end []byte) sdk.Iterator {
+func (s Store) Iterator(start, end []byte) types.Iterator {
 	if end == nil {
-		end = sdk.PrefixEndBytes(s.prefix)
+		end = types.PrefixEndBytes(s.prefix)
 	} else {
 		end = append(s.prefix, end...)
 	}
@@ -52,9 +52,9 @@ func (s Store) Iterator(start, end []byte) sdk.Iterator {
 }
 
 // Implements KVStore
-func (s Store) ReverseIterator(start, end []byte) sdk.Iterator {
+func (s Store) ReverseIterator(start, end []byte) types.Iterator {
 	if end == nil {
-		end = sdk.PrefixEndBytes(s.prefix)
+		end = types.PrefixEndBytes(s.prefix)
 	} else {
 		end = append(s.prefix, end...)
 	}
@@ -67,7 +67,7 @@ func (s Store) ReverseIterator(start, end []byte) sdk.Iterator {
 type prefixIterator struct {
 	prefix []byte
 
-	iter sdk.Iterator
+	iter types.Iterator
 }
 
 // Implements Iterator
