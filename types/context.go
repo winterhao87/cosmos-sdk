@@ -86,9 +86,6 @@ func (c Context) WithValue(key interface{}, value interface{}) Context {
 func (c Context) WithCloner(key interface{}, value cloner) Context {
 	return c.withValue(key, value)
 }
-func (c Context) WithCacheWrapper(key interface{}, value CacheWrapper) Context {
-	return c.withValue(key, value)
-}
 func (c Context) WithProtoMsg(key interface{}, value proto.Message) Context {
 	return c.withValue(key, value)
 }
@@ -141,6 +138,7 @@ const (
 // NOTE: Do not expose MultiStore.
 // MultiStore exposes all the keys.
 // Instead, pass the context and the store key.
+// Returning CacheWrapperMultiStore to cachewrap it
 func (c Context) multiStore() MultiStore {
 	return c.Value(contextKeyMultiStore).(MultiStore)
 }
@@ -211,7 +209,7 @@ func (c Context) WithMinimumFees(minFees Coins) Context {
 // Cache the multistore and return a new cached context. The cached context is
 // written to the context when writeCache is called.
 func (c Context) CacheContext() (cc Context, writeCache func()) {
-	cms := c.multiStore().CacheMultiStore()
+	cms := c.multiStore().CacheWrap()
 	cc = c.WithMultiStore(cms)
 	return cc, cms.Write
 }

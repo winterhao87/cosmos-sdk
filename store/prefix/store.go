@@ -1,12 +1,7 @@
 package prefix
 
 import (
-	"io"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
-	"github.com/cosmos/cosmos-sdk/store/cache"
-	"github.com/cosmos/cosmos-sdk/store/trace"
 )
 
 var _ sdk.KVStore = Store{}
@@ -16,14 +11,11 @@ type Store struct {
 	prefix []byte
 }
 
-// Implements CacheWrap
-func (s Store) CacheWrap() sdk.CacheWrap {
-	return cache.NewStore(s)
-}
-
-// CacheWrapWithTrace implements the KVStore interface.
-func (s Store) CacheWrapWithTrace(w io.Writer, tc sdk.TraceContext) sdk.CacheWrap {
-	return cache.NewStore(trace.NewStore(s, w, tc))
+func NewStore(parent sdk.KVStore, prefix []byte) Store {
+	return Store{
+		parent: parent,
+		prefix: prefix,
+	}
 }
 
 // Implements KVStore
