@@ -13,8 +13,8 @@ const (
 )
 
 var (
-	cachedDefaultGasConfig   = DefaultGasConfig()
-	cachedTransientGasConfig = TransientGasConfig()
+	cachedKVGasConfig        = DefaultKVGasConfig()
+	cachedTransientGasConfig = DefaultTransientGasConfig()
 )
 
 // Gas measured by the SDK
@@ -86,8 +86,13 @@ type GasConfig struct {
 	IterNextCostFlat Gas
 }
 
-// DefaultGasConfig returns a default gas config for KVStores.
-func DefaultGasConfig() GasConfig {
+var (
+	cachedDefaultKVGasConfig        = DefaultKVGasConfig()
+	cachedDefaultTransientGasConfig = DefaultTransientGasConfig()
+)
+
+// DefaultKVGasConfig returns a default gas config for KVStores.
+func DefaultKVGasConfig() GasConfig {
 	return GasConfig{
 		HasCostFlat:      10,
 		DeleteCostFlat:   10,
@@ -101,9 +106,9 @@ func DefaultGasConfig() GasConfig {
 }
 
 // TransientGasConfig returns a default gas config for TransientStores.
-func TransientGasConfig() GasConfig {
+func DefaultTransientGasConfig() GasConfig {
 	// TODO: define gasconfig for transient stores
-	return DefaultGasConfig()
+	return DefaultKVGasConfig()
 }
 
 type GasTank struct {
