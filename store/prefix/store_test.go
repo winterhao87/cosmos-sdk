@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tendermint/iavl"
 	dbm "github.com/tendermint/tendermint/libs/db"
 
+	"github.com/cosmos/cosmos-sdk/store/dbadapter"
 	"github.com/cosmos/cosmos-sdk/store/types"
 )
 
@@ -33,8 +33,8 @@ func setRandomKVPairs(t *testing.T, store types.KVStore) []kvpair {
 }
 
 func testPrefixStore(t *testing.T, baseStore types.KVStore, prefix []byte) {
-	prefixStore := baseStore.Prefix(prefix)
-	prefixPrefixStore := prefixStore.Prefix([]byte("prefix"))
+	prefixStore := NewStore(baseStore, prefix)
+	prefixPrefixStore := NewStore(prefixStore, []byte("prefix"))
 
 	kvps := setRandomKVPairs(t, prefixPrefixStore)
 
@@ -64,38 +64,16 @@ func testPrefixStore(t *testing.T, baseStore types.KVStore, prefix []byte) {
 	}
 }
 
-func TestIAVLStorePrefix(t *testing.T) {
-	db := dbm.NewMemDB()
-	tree := iavl.NewMutableTree(db, cacheSize)
-	iavlStore := newIAVLStore(tree, numRecent, storeEvery)
-
-	testPrefixStore(t, iavlStore, []byte("test"))
-}
-
-func TestCacheKVStorePrefix(t *testing.T) {
-	cacheStore := newCachetypes.KVStore()
-
-	testPrefixStore(t, cacheStore, []byte("test"))
-}
-
-func TestGasKVStorePrefix(t *testing.T) {
-	meter := types.NewGasMeter(100000000)
-	mem := dbStoreAdapter{dbm.NewMemDB()}
-	gasStore := NewGastypes.KVStore(meter, types.DefaultGasConfig(), mem)
-
-	testPrefixStore(t, gasStore, []byte("test"))
-}
-
 func TestPrefixStoreIterate(t *testing.T) {
 	db := dbm.NewMemDB()
-	baseStore := dbStoreAdapter{db}
+	baseStore := dbadapter.NewStore(db)
 	prefix := []byte("test")
-	prefixStore := baseStore.Prefix(prefix)
+	prefixStore := NewStore(baseStore, prefix)
 
 	setRandomKVPairs(t, prefixStore)
 
-	bIter := types.types.KVStorePrefixIterator(baseStore, prefix)
-	pIter := types.types.KVStorePrefixIterator(prefixStore, nil)
+	bIter := types.KVStorePrefixIterator(baseStore, prefix)
+	pIter := types.KVStorePrefixIterator(prefixStore, nil)
 
 	for bIter.Valid() && pIter.Valid() {
 		require.Equal(t, bIter.Key(), append(prefix, pIter.Key()...))

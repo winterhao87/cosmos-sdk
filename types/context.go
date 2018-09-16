@@ -179,11 +179,7 @@ func (c Context) WithBlockHeight(height int64) Context {
 }
 
 func (c Context) WithConsensusParams(params *abci.ConsensusParams) Context {
-	if params == nil {
-		return c
-	}
-	return c.withValue(contextKeyConsensusParams, params).
-		WithGasMeter(NewGasMeter(params.TxSize.MaxGas))
+	return c.withValue(contextKeyConsensusParams, params)
 }
 
 func (c Context) WithChainID(chainID string) Context { return c.withValue(contextKeyChainID, chainID) }
