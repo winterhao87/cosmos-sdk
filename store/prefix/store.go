@@ -6,6 +6,7 @@ import (
 
 var _ types.KVStore = Store{}
 
+// Store with key prefixed
 type Store struct {
 	parent types.KVStore
 	prefix []byte
