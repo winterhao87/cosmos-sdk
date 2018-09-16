@@ -13,7 +13,7 @@ import (
 )
 
 func newGasTank(limit types.Gas) *types.GasTank {
-	return types.NewGasTank(limit, types.DefaultGasConfig())
+	return types.NewGasTank(limit, types.DefaultKVGasConfig())
 }
 
 func newGasKVStore() types.KVStore {
