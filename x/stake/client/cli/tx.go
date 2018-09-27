@@ -7,13 +7,22 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/client/utils"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/server"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	authtxb "github.com/cosmos/cosmos-sdk/x/auth/client/txbuilder"
 	"github.com/cosmos/cosmos-sdk/x/stake"
 
+	"github.com/tendermint/tendermint/p2p"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+const (
+	flagGenesisFormat = "genesis-format"
+	flagIP            = "ip"
+	flagNodeKeyFile   = "node-key-file"
 )
 
 // GetCmdCreateValidator implements the create validator command handler.
@@ -87,8 +96,27 @@ func GetCmdCreateValidator(cdc *codec.Codec) *cobra.Command {
 				)
 			}
 
+			if viper.GetBool(flagGenesisFormat) {
+				ip := viper.GetString(flagIP)
+				if len(ip) == 0 {
+					eip, err := server.ExternalIP()
+					if err != nil {
+						return err
+					}
+					ip = eip
+				}
+
+				nodeKey, err := p2p.LoadOrGenNodeKey(viper.GetString(flagNodeKeyFile))
+				if err != nil {
+					return err
+				}
+				txBldr = txBldr.WithMemo(fmt.Sprintf("%s@%s:26656", string(nodeKey.ID()), ip))
+
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, true)
+			}
+
 			if cliCtx.GenerateOnly {
-				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, true)
 			}
 
 			// build and sign the transaction, then broadcast to Tendermint
@@ -101,6 +129,9 @@ func GetCmdCreateValidator(cdc *codec.Codec) *cobra.Command {
 	cmd.Flags().AddFlagSet(fsDescriptionCreate)
 	cmd.Flags().AddFlagSet(fsCommissionCreate)
 	cmd.Flags().AddFlagSet(fsDelegator)
+	cmd.Flags().Bool(flagGenesisFormat, false, "Export the transaction in gen-tx format; it implies --generate-only")
+	cmd.Flags().String(flagIP, "", fmt.Sprintf("External IP to use as node's public address; if left blank IP will be retrieved from this machine. It takes effect only when used in combination with --%s", flagGenesisFormat))
+	cmd.Flags().String(flagNodeKeyFile, "", "Path to to node_key.json")
 
 	return cmd
 }
@@ -143,7 +174,7 @@ func GetCmdEditValidator(cdc *codec.Codec) *cobra.Command {
 			msg := stake.NewMsgEditValidator(sdk.ValAddress(valAddr), description, newRate)
 
 			if cliCtx.GenerateOnly {
-				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, false)
 			}
 
 			// build and sign the transaction, then broadcast to Tendermint
@@ -186,7 +217,7 @@ func GetCmdDelegate(cdc *codec.Codec) *cobra.Command {
 			msg := stake.NewMsgDelegate(delAddr, valAddr, amount)
 
 			if cliCtx.GenerateOnly {
-				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, false)
 			}
 			// build and sign the transaction, then broadcast to Tendermint
 			return utils.CompleteAndBroadcastTxCli(txBldr, cliCtx, []sdk.Msg{msg})
@@ -257,7 +288,7 @@ func GetCmdBeginRedelegate(storeName string, cdc *codec.Codec) *cobra.Command {
 			msg := stake.NewMsgBeginRedelegate(delAddr, valSrcAddr, valDstAddr, sharesAmount)
 
 			if cliCtx.GenerateOnly {
-				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, false)
 			}
 			// build and sign the transaction, then broadcast to Tendermint
 			return utils.CompleteAndBroadcastTxCli(txBldr, cliCtx, []sdk.Msg{msg})
@@ -299,7 +330,7 @@ func GetCmdCompleteRedelegate(cdc *codec.Codec) *cobra.Command {
 			msg := stake.NewMsgCompleteRedelegate(delAddr, valSrcAddr, valDstAddr)
 
 			if cliCtx.GenerateOnly {
-				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, false)
 			}
 			// build and sign the transaction, then broadcast to Tendermint
 			return utils.CompleteAndBroadcastTxCli(txBldr, cliCtx, []sdk.Msg{msg})
@@ -362,7 +393,7 @@ func GetCmdBeginUnbonding(storeName string, cdc *codec.Codec) *cobra.Command {
 			msg := stake.NewMsgBeginUnbonding(delAddr, valAddr, sharesAmount)
 
 			if cliCtx.GenerateOnly {
-				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, false)
 			}
 			// build and sign the transaction, then broadcast to Tendermint
 			return utils.CompleteAndBroadcastTxCli(txBldr, cliCtx, []sdk.Msg{msg})
@@ -399,7 +430,7 @@ func GetCmdCompleteUnbonding(cdc *codec.Codec) *cobra.Command {
 			msg := stake.NewMsgCompleteUnbonding(delAddr, valAddr)
 
 			if cliCtx.GenerateOnly {
-				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+				return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg}, false)
 			}
 			// build and sign the transaction, then broadcast to Tendermint
 			return utils.CompleteAndBroadcastTxCli(txBldr, cliCtx, []sdk.Msg{msg})
