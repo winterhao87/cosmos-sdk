@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	auth "github.com/cosmos/cosmos-sdk/x/auth"
 )
 
 //Parameter names, for init gen-tx command
@@ -168,10 +170,10 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 			config := ctx.Config
 			config.SetRoot(viper.GetString(tmcli.HomeFlag))
 			initConfig := InitConfig{
-				viper.GetString(FlagChainID),
-				viper.GetBool(FlagWithTxs),
-				filepath.Join(config.RootDir, "config", "gentx"),
-				viper.GetBool(FlagOverwrite),
+				ChainID:   viper.GetString(FlagChainID),
+				GenTxs:    viper.GetBool(FlagWithTxs),
+				GenTxsDir: filepath.Join(config.RootDir, "config", "gentx"),
+				Overwrite: viper.GetBool(FlagOverwrite),
 			}
 
 			chainID, nodeID, appMessage, err := initWithConfig(cdc, appInit, config, initConfig)
@@ -268,6 +270,47 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 	if err != nil {
 		return
 	}
+
+	return
+}
+
+func processStdTxs(genTxsDir string, cdc *codec.Codec) (txs []auth.StdTx, persistentPeers string, err error) {
+	var fos []os.FileInfo
+	fos, err = ioutil.ReadDir(genTxsDir)
+	if err != nil {
+		return
+	}
+
+	var addresses []string
+	for _, fo := range fos {
+		filename := path.Join(genTxsDir, fo.Name())
+		if !fo.IsDir() && (path.Ext(filename) != ".json") {
+			continue
+		}
+
+		// get the genTx
+		var bz []byte
+		bz, err = ioutil.ReadFile(filename)
+		if err != nil {
+			return
+		}
+		var genTx auth.StdTx
+		err = cdc.UnmarshalJSON(bz, &genTx)
+		if err != nil {
+			return
+		}
+		txs = append(txs, genTx)
+
+		nodeAddr := genTx.GetMemo()
+		if len(nodeAddr) == 0 {
+			err = fmt.Errorf("couldn't find node's address in %s", fo.Name())
+			return
+		}
+		addresses = append(addresses, nodeAddr)
+	}
+
+	sort.Strings(addresses)
+	persistentPeers = strings.Join(addresses, ",")
 
 	return
 }
