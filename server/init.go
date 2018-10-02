@@ -119,7 +119,7 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 		return
 	}
 	nodeID = string(nodeKey.ID())
-	pubKey := readOrCreatePrivValidator(config)
+	//pubKey := readOrCreatePrivValidator(config)
 
 	if initConfig.ChainID == "" {
 		initConfig.ChainID = fmt.Sprintf("test-chain-%v", cmn.RandStr(6))

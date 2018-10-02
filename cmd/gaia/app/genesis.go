@@ -78,7 +78,6 @@ func GaiaAppInit() server.AppInit {
 	return server.AppInit{
 		FlagsAppGenState: fsAppGenState,
 		FlagsAppGenTx:    fsAppGenTx,
-		AppGenTx:         GaiaAppGenTx,
 		AppGenState:      GaiaAppGenStateJSON,
 	}
 }
@@ -169,9 +168,9 @@ func GaiaAppGenState(cdc *codec.Codec, appGenTxs []auth.StdTx) (genesisState Gen
 
 	// start with the default staking genesis state
 	stakeData := stake.DefaultGenesisState()
-	genaccs := make([]GenesisAccount, len(msgs))
+	genaccs := make([]GenesisAccount, len(appGenTxs))
 
-	for _, genTx := range appGenTxs {
+	for i, genTx := range appGenTxs {
 		msgs := genTx.GetMsgs()
 		if len(msgs) == 0 {
 			err = errors.New("must provide at least genesis message")
@@ -202,7 +201,7 @@ func GaiaAppGenState(cdc *codec.Codec, appGenTxs []auth.StdTx) (genesisState Gen
 
 func addValidatorToStakeData(msg stake.MsgCreateValidator, stakeData stake.GenesisState) stake.GenesisState {
 	validator := stake.NewValidator(
-		sdk.ValAddress(msg.ValidatorAddr), sdk.MustGetConsPubKeyBech32(msg.PubKey), genTx.Description,
+		sdk.ValAddress(msg.ValidatorAddr), msg.PubKey, msg.Description,
 	)
 
 	stakeData.Pool.LooseTokens = stakeData.Pool.LooseTokens.Add(sdk.NewDec(freeFermionVal)) // increase the supply
@@ -225,8 +224,8 @@ func addValidatorToStakeData(msg stake.MsgCreateValidator, stakeData stake.Genes
 }
 
 func genesisAccountFromMsgCreateValidator(msg stake.MsgCreateValidator) GenesisAccount {
-	accAuth := auth.NewBaseAccountWithAddress(msg.ValidatorAddr)
-	acc.Coins = sdk.Coin{msg.Delegation}
+	accAuth := auth.NewBaseAccountWithAddress(sdk.AccAddress(msg.ValidatorAddr))
+	accAuth.Coins = []sdk.Coin{msg.Delegation}
 	return NewGenesisAccount(&accAuth)
 }
 
@@ -277,8 +276,7 @@ func validateGenesisStateAccounts(accs []GenesisAccount) (err error) {
 }
 
 // GaiaAppGenState but with JSON
-func GaiaAppGenStateJSON(cdc *codec.Codec, appGenTxs []json.RawMessage) (appState json.RawMessage, err error) {
-
+func GaiaAppGenStateJSON(cdc *codec.Codec, appGenTxs []auth.StdTx) (appState json.RawMessage, err error) {
 	// create the final app state
 	genesisState, err := GaiaAppGenState(cdc, appGenTxs)
 	if err != nil {
