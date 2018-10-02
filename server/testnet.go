@@ -7,13 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	gc "github.com/cosmos/cosmos-sdk/server/config"
-
-	"os"
-
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/spf13/viper"
-	cfg "github.com/tendermint/tendermint/config"
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
@@ -44,9 +39,12 @@ Example:
 	gaiad testnet --v 4 --o ./output --starting-ip-address 192.168.10.2
 	`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			config := ctx.Config
-			err := testnetWithConfig(config, cdc, appInit)
-			return err
+			/*
+				config := ctx.Config
+				err := testnetWithConfig(config, cdc, appInit)
+				return err
+			*/
+			return nil
 		},
 	}
 	cmd.Flags().Int(nValidators, 4,
@@ -65,93 +63,93 @@ Example:
 	return cmd
 }
 
-func testnetWithConfig(config *cfg.Config, cdc *codec.Codec, appInit AppInit) error {
-	outDir := viper.GetString(outputDir)
-	numValidators := viper.GetInt(nValidators)
+// func testnetWithConfig(config *cfg.Config, cdc *codec.Codec, appInit AppInit) error {
+// 	outDir := viper.GetString(outputDir)
+// 	numValidators := viper.GetInt(nValidators)
 
-	// Generate private key, node ID, initial transaction
-	for i := 0; i < numValidators; i++ {
-		nodeDirName := fmt.Sprintf("%s%d", viper.GetString(nodeDirPrefix), i)
-		nodeDaemonHomeName := viper.GetString(nodeDaemonHome)
-		nodeCliHomeName := viper.GetString(nodeCliHome)
-		nodeDir := filepath.Join(outDir, nodeDirName, nodeDaemonHomeName)
-		clientDir := filepath.Join(outDir, nodeDirName, nodeCliHomeName)
-		gentxsDir := filepath.Join(outDir, "gentxs")
-		config.SetRoot(nodeDir)
+// 	// Generate private key, node ID, initial transaction
+// 	for i := 0; i < numValidators; i++ {
+// 		nodeDirName := fmt.Sprintf("%s%d", viper.GetString(nodeDirPrefix), i)
+// 		nodeDaemonHomeName := viper.GetString(nodeDaemonHome)
+// 		nodeCliHomeName := viper.GetString(nodeCliHome)
+// 		nodeDir := filepath.Join(outDir, nodeDirName, nodeDaemonHomeName)
+// 		clientDir := filepath.Join(outDir, nodeDirName, nodeCliHomeName)
+// 		gentxsDir := filepath.Join(outDir, "gentxs")
+// 		config.SetRoot(nodeDir)
 
-		err := os.MkdirAll(filepath.Join(nodeDir, "config"), nodeDirPerm)
-		if err != nil {
-			_ = os.RemoveAll(outDir)
-			return err
-		}
+// 		err := os.MkdirAll(filepath.Join(nodeDir, "config"), nodeDirPerm)
+// 		if err != nil {
+// 			_ = os.RemoveAll(outDir)
+// 			return err
+// 		}
 
-		err = os.MkdirAll(clientDir, nodeDirPerm)
-		if err != nil {
-			_ = os.RemoveAll(outDir)
-			return err
-		}
+// 		err = os.MkdirAll(clientDir, nodeDirPerm)
+// 		if err != nil {
+// 			_ = os.RemoveAll(outDir)
+// 			return err
+// 		}
 
-		config.Moniker = nodeDirName
-		ip, err := getIP(i)
-		if err != nil {
-			return err
-		}
+// 		config.Moniker = nodeDirName
+// 		ip, err := getIP(i)
+// 		if err != nil {
+// 			return err
+// 		}
 
-		genTxConfig := gc.GenTx{
-			nodeDirName,
-			clientDir,
-			true,
-			ip,
-		}
+// 		genTxConfig := gc.GenTx{
+// 			nodeDirName,
+// 			clientDir,
+// 			true,
+// 			ip,
+// 		}
 
-		// Run `init gen-tx` and generate initial transactions
-		cliPrint, genTxFile, err := gentxWithConfig(cdc, appInit, config, genTxConfig)
-		if err != nil {
-			return err
-		}
+// 		// Run `init gen-tx` and generate initial transactions
+// 		cliPrint, genTxFile, err := gentxWithConfig(cdc, appInit, config, genTxConfig)
+// 		if err != nil {
+// 			return err
+// 		}
 
-		// Save private key seed words
-		name := fmt.Sprintf("%v.json", "key_seed")
-		err = writeFile(name, clientDir, cliPrint)
-		if err != nil {
-			return err
-		}
+// 		// Save private key seed words
+// 		name := fmt.Sprintf("%v.json", "key_seed")
+// 		err = writeFile(name, clientDir, cliPrint)
+// 		if err != nil {
+// 			return err
+// 		}
 
-		// Gather gentxs folder
-		name = fmt.Sprintf("%v.json", nodeDirName)
-		err = writeFile(name, gentxsDir, genTxFile)
-		if err != nil {
-			return err
-		}
-	}
+// 		// Gather gentxs folder
+// 		name = fmt.Sprintf("%v.json", nodeDirName)
+// 		err = writeFile(name, gentxsDir, genTxFile)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
 
-	// Generate genesis.json and config.toml
-	chainID := "chain-" + cmn.RandStr(6)
-	for i := 0; i < numValidators; i++ {
+// 	// Generate genesis.json and config.toml
+// 	chainID := "chain-" + cmn.RandStr(6)
+// 	for i := 0; i < numValidators; i++ {
 
-		nodeDirName := fmt.Sprintf("%s%d", viper.GetString(nodeDirPrefix), i)
-		nodeDaemonHomeName := viper.GetString(nodeDaemonHome)
-		nodeDir := filepath.Join(outDir, nodeDirName, nodeDaemonHomeName)
-		gentxsDir := filepath.Join(outDir, "gentxs")
-		initConfig := InitConfig{
-			chainID,
-			true,
-			gentxsDir,
-			true,
-		}
-		config.Moniker = nodeDirName
-		config.SetRoot(nodeDir)
+// 		nodeDirName := fmt.Sprintf("%s%d", viper.GetString(nodeDirPrefix), i)
+// 		nodeDaemonHomeName := viper.GetString(nodeDaemonHome)
+// 		nodeDir := filepath.Join(outDir, nodeDirName, nodeDaemonHomeName)
+// 		gentxsDir := filepath.Join(outDir, "gentxs")
+// 		initConfig := InitConfig{
+// 			chainID,
+// 			true,
+// 			gentxsDir,
+// 			true,
+// 		}
+// 		config.Moniker = nodeDirName
+// 		config.SetRoot(nodeDir)
 
-		// Run `init` and generate genesis.json and config.toml
-		_, _, _, err := initWithConfig(cdc, appInit, config, initConfig)
-		if err != nil {
-			return err
-		}
-	}
+// 		// Run `init` and generate genesis.json and config.toml
+// 		_, _, _, err := initWithConfig(cdc, appInit, config, initConfig)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
 
-	fmt.Printf("Successfully initialized %v node directories\n", viper.GetInt(nValidators))
-	return nil
-}
+// 	fmt.Printf("Successfully initialized %v node directories\n", viper.GetInt(nValidators))
+// 	return nil
+// }
 
 func getIP(i int) (ip string, err error) {
 	ip = viper.GetString(startingIPAddress)
