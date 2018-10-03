@@ -16,14 +16,12 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys"
-	"github.com/tendermint/tendermint/crypto"
 
 	cfg "github.com/tendermint/tendermint/config"
 	tmcli "github.com/tendermint/tendermint/libs/cli"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/p2p"
-	pvm "github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	clkeys "github.com/cosmos/cosmos-sdk/client/keys"
@@ -206,20 +204,6 @@ func processStdTxs(moniker string, genTxsDir string, cdc *codec.Codec) (
 }
 
 //________________________________________________________________________________________
-
-// read of create the private key file for this config
-func readOrCreatePrivValidator(tmConfig *cfg.Config) crypto.PubKey {
-	// private validator
-	privValFile := tmConfig.PrivValidatorFile()
-	var privValidator *pvm.FilePV
-	if cmn.FileExists(privValFile) {
-		privValidator = pvm.LoadFilePV(privValFile)
-	} else {
-		privValidator = pvm.GenFilePV(privValFile)
-		privValidator.Save()
-	}
-	return privValidator.GetPubKey()
-}
 
 // writeGenesisFile creates and writes the genesis configuration to disk. An
 // error is returned if building or writing the configuration to file fails.
