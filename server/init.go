@@ -64,19 +64,17 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 				Overwrite: viper.GetBool(FlagOverwrite),
 			}
 
-			chainID, nodeID, appMessage, err := initWithConfig(cdc, appInit, config, initConfig)
+			chainID, nodeID, err := initWithConfig(cdc, appInit, config, initConfig)
 			if err != nil {
 				return err
 			}
 			// print out some key information
 			toPrint := struct {
-				ChainID    string          `json:"chain_id"`
-				NodeID     string          `json:"node_id"`
-				AppMessage json.RawMessage `json:"app_message"`
+				ChainID string `json:"chain_id"`
+				NodeID  string `json:"node_id"`
 			}{
 				chainID,
 				nodeID,
-				appMessage,
 			}
 			out, err := codec.MarshalJSONIndent(cdc, toPrint)
 			if err != nil {
@@ -94,7 +92,7 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 }
 
 func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initConfig InitConfig) (
-	chainID string, nodeID string, appMessage json.RawMessage, err error) {
+	chainID string, nodeID string, err error) {
 
 	if config.Moniker == "" {
 		err = errors.New("please enter a moniker for the validator using --moniker")
