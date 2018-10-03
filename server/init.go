@@ -33,17 +33,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/stake"
 )
 
-//Parameter names, for init gen-tx command
-var (
-	FlagName       = "name"
-	FlagClientHome = "home-client"
-	FlagOWK        = "owk"
-)
-
-//parameter names, init command
-var (
+// parameter names, init command
+const (
+	FlagMoniker   = "moniker"
 	FlagOverwrite = "overwrite"
-	FlagWithTxs   = "with-txs"
 	FlagIP        = "ip"
 	FlagChainID   = "chain-id"
 )
@@ -51,8 +44,8 @@ var (
 // Storage for init command input parameters
 type InitConfig struct {
 	ChainID   string
-	GenTxs    bool
 	GenTxsDir string
+	Moniker   string
 	Overwrite bool
 }
 
@@ -68,8 +61,8 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 			config.SetRoot(viper.GetString(tmcli.HomeFlag))
 			initConfig := InitConfig{
 				ChainID:   viper.GetString(FlagChainID),
-				GenTxs:    viper.GetBool(FlagWithTxs),
 				GenTxsDir: filepath.Join(config.RootDir, "config", "gentx"),
+				Moniker:   viper.GetString(FlagMoniker),
 				Overwrite: viper.GetBool(FlagOverwrite),
 			}
 
@@ -97,12 +90,19 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 	}
 	cmd.Flags().BoolP(FlagOverwrite, "o", false, "overwrite the genesis.json file")
 	cmd.Flags().String(FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
+	cmd.Flags().String(FlagMoniker, "", "validator name")
 	cmd.Flags().AddFlagSet(appInit.FlagsAppGenState)
 	return cmd
 }
 
 func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initConfig InitConfig) (
 	chainID string, nodeID string, appMessage json.RawMessage, err error) {
+
+	if config.Moniker == "" {
+		err = errors.New("please enter a moniker for the validator using --moniker")
+		return
+	}
+
 	nodeKey, err := p2p.LoadOrGenNodeKey(config.NodeKeyFile())
 	if err != nil {
 		return
@@ -125,10 +125,11 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 	var validators []tmtypes.GenesisValidator
 	var persistentPeers string
 
-	validators, appGenTxs, persistentPeers, err = processStdTxs(initConfig.GenTxsDir, cdc)
+	validators, appGenTxs, persistentPeers, err = processStdTxs(initConfig.Moniker, initConfig.GenTxsDir, cdc)
 	if err != nil {
 		return
 	}
+
 	config.P2P.PersistentPeers = persistentPeers
 	configFilePath := filepath.Join(config.RootDir, "config", "config.toml")
 	cfg.WriteConfigFile(configFilePath, config)
@@ -146,7 +147,7 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 	return
 }
 
-func processStdTxs(genTxsDir string, cdc *codec.Codec) (
+func processStdTxs(moniker string, genTxsDir string, cdc *codec.Codec) (
 	validators []tmtypes.GenesisValidator, txs []auth.StdTx, persistentPeers string, err error) {
 	var fos []os.FileInfo
 	fos, err = ioutil.ReadDir(genTxsDir)
@@ -179,7 +180,6 @@ func processStdTxs(genTxsDir string, cdc *codec.Codec) (
 			err = fmt.Errorf("couldn't find node's address in %s", fo.Name())
 			return
 		}
-		addresses = append(addresses, nodeAddr)
 
 		msgs := genTx.GetMsgs()
 		if len(msgs) != 1 {
@@ -192,6 +192,11 @@ func processStdTxs(genTxsDir string, cdc *codec.Codec) (
 			Power:  10,
 			Name:   msg.Description.Moniker,
 		})
+
+		// exclude itself from persistent peers
+		if msg.Description.Moniker != moniker {
+			addresses = append(addresses, nodeAddr)
+		}
 	}
 
 	sort.Strings(addresses)
