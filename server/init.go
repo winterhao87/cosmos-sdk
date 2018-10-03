@@ -98,7 +98,6 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 	cmd.Flags().BoolP(FlagOverwrite, "o", false, "overwrite the genesis.json file")
 	cmd.Flags().String(FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
 	cmd.Flags().AddFlagSet(appInit.FlagsAppGenState)
-	cmd.Flags().AddFlagSet(appInit.FlagsAppGenTx) // need to add this flagset for when no GenTx's provided
 	return cmd
 }
 
@@ -109,7 +108,6 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 		return
 	}
 	nodeID = string(nodeKey.ID())
-	//pubKey := readOrCreatePrivValidator(config)
 
 	if initConfig.ChainID == "" {
 		initConfig.ChainID = fmt.Sprintf("test-chain-%v", cmn.RandStr(6))
@@ -127,35 +125,13 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 	var validators []tmtypes.GenesisValidator
 	var persistentPeers string
 
-	if initConfig.GenTxs {
-		appGenTxs, persistentPeers, err = processStdTxs(initConfig.GenTxsDir, cdc)
-		if err != nil {
-			return
-		}
-		config.P2P.PersistentPeers = persistentPeers
-		configFilePath := filepath.Join(config.RootDir, "config", "config.toml")
-		cfg.WriteConfigFile(configFilePath, config)
+	validators, appGenTxs, persistentPeers, err = processStdTxs(initConfig.GenTxsDir, cdc)
+	if err != nil {
+		return
 	}
-	// } else {
-	// 	genTxConfig := serverconfig.GenTx{
-	// 		viper.GetString(FlagName),
-	// 		viper.GetString(FlagClientHome),
-	// 		viper.GetBool(FlagOWK),
-	// 		"127.0.0.1",
-	// 	}
-
-	// 	// Write updated config with moniker
-	// 	config.Moniker = genTxConfig.Name
-	// 	configFilePath := filepath.Join(config.RootDir, "config", "config.toml")
-	// 	cfg.WriteConfigFile(configFilePath, config)
-	// 	appGenTx, am, validator, err := appInit.AppGenTx(cdc, pubKey, genTxConfig)
-	// 	appMessage = am
-	// 	if err != nil {
-	// 		return "", "", nil, err
-	// 	}
-	// 	validators = []tmtypes.GenesisValidator{validator}
-	// 	appGenTxs = []json.RawMessage{appGenTx}
-	// }
+	config.P2P.PersistentPeers = persistentPeers
+	configFilePath := filepath.Join(config.RootDir, "config", "config.toml")
+	cfg.WriteConfigFile(configFilePath, config)
 
 	appState, err := appInit.AppGenState(cdc, appGenTxs)
 	if err != nil {
@@ -170,7 +146,8 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 	return
 }
 
-func processStdTxs(genTxsDir string, cdc *codec.Codec) (txs []auth.StdTx, persistentPeers string, err error) {
+func processStdTxs(genTxsDir string, cdc *codec.Codec) (
+	validators []tmtypes.GenesisValidator, txs []auth.StdTx, persistentPeers string, err error) {
 	var fos []os.FileInfo
 	fos, err = ioutil.ReadDir(genTxsDir)
 	if err != nil {
@@ -203,6 +180,18 @@ func processStdTxs(genTxsDir string, cdc *codec.Codec) (txs []auth.StdTx, persis
 			return
 		}
 		addresses = append(addresses, nodeAddr)
+
+		msgs := genTx.GetMsgs()
+		if len(msgs) != 1 {
+			err = errors.New("each genesis transaction must provide a single genesis message")
+			return
+		}
+		msg := msgs[0].(stake.MsgCreateValidator)
+		validators = append(validators, tmtypes.GenesisValidator{
+			PubKey: msg.PubKey,
+			Power:  10,
+			Name:   msg.Description.Moniker,
+		})
 	}
 
 	sort.Strings(addresses)
@@ -251,7 +240,6 @@ type AppInit struct {
 
 	// flags required for application init functions
 	FlagsAppGenState *pflag.FlagSet
-	FlagsAppGenTx    *pflag.FlagSet
 
 	// AppGenState creates the core parameters initialization. It takes in a
 	// pubkey meant to represent the pubkey of the validator of this machine.
