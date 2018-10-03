@@ -48,14 +48,6 @@ var (
 	FlagChainID   = "chain-id"
 )
 
-// genesis piece structure for creating combined genesis
-type GenesisTx struct {
-	NodeID    string                   `json:"node_id"`
-	IP        string                   `json:"ip"`
-	Validator tmtypes.GenesisValidator `json:"validator"`
-	AppGenTx  json.RawMessage          `json:"app_gen_tx"`
-}
-
 // Storage for init command input parameters
 type InitConfig struct {
 	ChainID   string
@@ -105,7 +97,6 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 	}
 	cmd.Flags().BoolP(FlagOverwrite, "o", false, "overwrite the genesis.json file")
 	cmd.Flags().String(FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
-	cmd.Flags().Bool(FlagWithTxs, false, "apply existing genesis transactions from [--home]/config/gentx/")
 	cmd.Flags().AddFlagSet(appInit.FlagsAppGenState)
 	cmd.Flags().AddFlagSet(appInit.FlagsAppGenTx) // need to add this flagset for when no GenTx's provided
 	return cmd
@@ -216,60 +207,6 @@ func processStdTxs(genTxsDir string, cdc *codec.Codec) (txs []auth.StdTx, persis
 
 	sort.Strings(addresses)
 	persistentPeers = strings.Join(addresses, ",")
-
-	return
-}
-
-// append a genesis-piece
-func processGenTxs(genTxsDir string, cdc *codec.Codec) (
-	validators []tmtypes.GenesisValidator, appGenTxs []json.RawMessage, persistentPeers string, err error) {
-
-	var fos []os.FileInfo
-	fos, err = ioutil.ReadDir(genTxsDir)
-	if err != nil {
-		return
-	}
-
-	genTxs := make(map[string]GenesisTx)
-	var nodeIDs []string
-	for _, fo := range fos {
-		filename := path.Join(genTxsDir, fo.Name())
-		if !fo.IsDir() && (path.Ext(filename) != ".json") {
-			continue
-		}
-
-		// get the genTx
-		var bz []byte
-		bz, err = ioutil.ReadFile(filename)
-		if err != nil {
-			return
-		}
-		var genTx GenesisTx
-		err = cdc.UnmarshalJSON(bz, &genTx)
-		if err != nil {
-			return
-		}
-
-		genTxs[genTx.NodeID] = genTx
-		nodeIDs = append(nodeIDs, genTx.NodeID)
-	}
-
-	sort.Strings(nodeIDs)
-
-	for _, nodeID := range nodeIDs {
-		genTx := genTxs[nodeID]
-
-		// combine some stuff
-		validators = append(validators, genTx.Validator)
-		appGenTxs = append(appGenTxs, genTx.AppGenTx)
-
-		// Add a persistent peer
-		comma := ","
-		if len(persistentPeers) == 0 {
-			comma = ""
-		}
-		persistentPeers += fmt.Sprintf("%s%s@%s:26656", comma, genTx.NodeID, genTx.IP)
-	}
 
 	return
 }
