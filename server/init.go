@@ -36,11 +36,11 @@ import (
 
 // parameter names, init command
 const (
-	FlagMoniker    = "moniker"
+	FlagName       = "name"
 	FlagOverwrite  = "overwrite"
+	FlagWithTxs    = "with-txs"
 	FlagIP         = "ip"
 	FlagChainID    = "chain-id"
-	FlagName       = "name"
 	FlagClientHome = "home-client"
 	FlagOWK        = "owk"
 )
@@ -48,6 +48,7 @@ const (
 // Storage for init command input parameters
 type InitConfig struct {
 	ChainID   string
+	GenTxs    bool
 	GenTxsDir string
 	Moniker   string
 	Overwrite bool
@@ -65,8 +66,9 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 			config.SetRoot(viper.GetString(tmcli.HomeFlag))
 			initConfig := InitConfig{
 				ChainID:   viper.GetString(FlagChainID),
+				GenTxs:    viper.GetBool(FlagWithTxs),
 				GenTxsDir: filepath.Join(config.RootDir, "config", "gentx"),
-				Moniker:   viper.GetString(FlagMoniker),
+				Moniker:   viper.GetString(FlagName),
 				Overwrite: viper.GetBool(FlagOverwrite),
 			}
 
@@ -92,10 +94,10 @@ func InitCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
 	}
 	cmd.Flags().BoolP(FlagOverwrite, "o", false, "overwrite the genesis.json file")
 	cmd.Flags().String(FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
-	cmd.Flags().String(FlagMoniker, "", "validator name")
+	cmd.Flags().Bool(FlagWithTxs, false, "apply existing genesis transactions from [--home]/config/gentx/")
+	cmd.Flags().String(FlagName, "", "validator name")
 	cmd.Flags().AddFlagSet(appInit.FlagsAppGenState)
 	cmd.Flags().AddFlagSet(appInit.FlagsAppGenTx) // need to add this flagset for when no GenTx's provided
-	cmd.AddCommand(GenTxCmd(ctx, cdc, appInit))
 	return cmd
 }
 
@@ -124,81 +126,45 @@ func initWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, initC
 		return
 	}
 
-	// process genesis transactions, or otherwise create one for defaults
 	var appGenTxs []auth.StdTx
 	var validators []tmtypes.GenesisValidator
 	var persistentPeers string
-
-	validators, appGenTxs, persistentPeers, err = processStdTxs(initConfig.Moniker, initConfig.GenTxsDir, cdc)
-	if err != nil {
-		return
-	}
-
-	config.P2P.PersistentPeers = persistentPeers
 	configFilePath := filepath.Join(config.RootDir, "config", "config.toml")
-	cfg.WriteConfigFile(configFilePath, config)
+	if initConfig.GenTxs {
+		// process genesis transactions, or otherwise create one for defaults
+		validators, appGenTxs, persistentPeers, err = processStdTxs(initConfig.Moniker, initConfig.GenTxsDir, cdc)
+		if err != nil {
+			return
+		}
+
+		config.Moniker = initConfig.Moniker
+		config.P2P.PersistentPeers = persistentPeers
+		cfg.WriteConfigFile(configFilePath, config)
+	} else {
+		genTxConfig := serverconfig.GenTx{
+			viper.GetString(FlagName),
+			viper.GetString(FlagClientHome),
+			viper.GetBool(FlagOWK),
+			"127.0.0.1",
+		}
+		config.Moniker = genTxConfig.Name
+		cfg.WriteConfigFile(configFilePath, config)
+
+		pubKey := readOrCreatePrivValidator(config)
+		appGenTx, _, err := appInit.AppGenTx(cdc, pubKey, genTxConfig)
+		if err != nil {
+			return chainID, nodeID, err
+		}
+		appGenTxs = []auth.StdTx{appGenTx}
+	}
 
 	appState, err := appInit.AppGenState(cdc, appGenTxs)
 	if err != nil {
-		return
+		return chainID, nodeID, err
 	}
 
 	err = writeGenesisFile(cdc, genFile, initConfig.ChainID, validators, appState)
-	if err != nil {
-		return
-	}
-
 	return
-}
-
-// get cmd to initialize all files for tendermint and application
-func GenTxCmd(ctx *Context, cdc *codec.Codec, appInit AppInit) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "gentx",
-		Short: "Create genesis transaction file (under [--home]/config/gentx/gentx-[nodeID].json)",
-		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, args []string) error {
-
-			config := ctx.Config
-			config.SetRoot(viper.GetString(tmcli.HomeFlag))
-
-			ip := viper.GetString(FlagIP)
-			if len(ip) == 0 {
-				eip, err := ExternalIP()
-				if err != nil {
-					return err
-				}
-				ip = eip
-			}
-
-			genTxConfig := serverconfig.GenTx{
-				viper.GetString(FlagName),
-				viper.GetString(FlagClientHome),
-				viper.GetBool(FlagOWK),
-				ip,
-			}
-			cliPrint, genTxFile, err := gentxWithConfig(cdc, appInit, config, genTxConfig)
-			if err != nil {
-				return err
-			}
-			toPrint := struct {
-				AppMessage json.RawMessage `json:"app_message"`
-				GenTxFile  json.RawMessage `json:"gen_tx_file"`
-			}{
-				cliPrint,
-				genTxFile,
-			}
-			out, err := codec.MarshalJSONIndent(cdc, toPrint)
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(out))
-			return nil
-		},
-	}
-	cmd.Flags().String(FlagIP, "", "external facing IP to use if left blank IP will be retrieved from this machine")
-	cmd.Flags().AddFlagSet(appInit.FlagsAppGenTx)
-	return cmd
 }
 
 func gentxWithConfig(cdc *codec.Codec, appInit AppInit, config *cfg.Config, genTxConfig serverconfig.GenTx) (
