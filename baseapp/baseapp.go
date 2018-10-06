@@ -393,7 +393,7 @@ func handleQueryCustom(app *BaseApp, path []string, req abci.RequestQuery) (res 
 	}
 
 	ctx := sdk.NewContext(app.cms.CacheWrap(), app.checkState.ctx.BlockHeader(), true, app.Logger).
-		WithMinumumFees(app.minimumFees)
+		WithMinimumFees(app.minimumFees)
 	// Passes the rest of the path as an argument to the querier.
 	// For example, in the path "custom/gov/proposal/test", the gov querier gets []string{"proposal", "test"} as the path
 	resBytes, err := querier(ctx, path[2:], req)

@@ -9,7 +9,7 @@ import (
 
 // nolint - reexport
 type (
-	CommitMultiStore = rootmulti.Store
+	CommitMultiStore = types.CommitMultiStore
 )
 
 // nolint - reexport
