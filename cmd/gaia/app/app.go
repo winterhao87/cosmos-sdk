@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -160,6 +161,7 @@ func (app *GaiaApp) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.R
 // custom logic for gaia initialization
 func (app *GaiaApp) initChainer(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
 	stateJSON := req.AppStateBytes
+	fmt.Println(string(stateJSON))
 	// TODO is this now the whole genesis file?
 
 	var genesisState GenesisState
@@ -191,6 +193,18 @@ func (app *GaiaApp) initChainer(ctx sdk.Context, req abci.RequestInitChain) abci
 	if err != nil {
 		// TODO find a way to do this w/o panics
 		panic(err)
+	}
+
+	if len(genesisState.Txs) > 0 {
+		for _, tx := range genesisState.Txs {
+			fmt.Printf("%v\n", tx.Signatures)
+			res := app.BaseApp.Deliver(tx)
+			if !res.IsOK() {
+				panic(res.Log)
+			}
+		}
+
+		validators = app.stakeKeeper.ApplyAndReturnValidatorSetUpdates(ctx)
 	}
 
 	return abci.ResponseInitChain{
